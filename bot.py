@@ -9,7 +9,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 # --- SOZLAMALAR ---
 API_TOKEN = '8710801366:AAGrsujotucdhiAm1aV0vMhbWStk_WBt_Ik' 
 CHANNEL_ID = '@jamoliddin_muvozanat' 
-MINI_APP_URL = 'https://google.com' # Bu yerga keyinchalik o'z saytingizni qo'yasiz
+MINI_APP_URL = 'https://google.com' 
+ADMIN_ID = 5711329638  # Sening Telegram ID raqaming
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
@@ -81,6 +82,34 @@ async def start_cmd(message: types.Message):
         await message.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
     else:
         await show_status(message)
+
+# --- STATISTIKA BUYRUG'I (FAQAT ADMIN UCHUN) ---
+@dp.message(Command("statistika"))
+async def stat_cmd(message: types.Message):
+    if message.from_user.id == ADMIN_ID:
+        conn = sqlite3.connect("muvozanat.db")
+        cursor = conn.cursor()
+        
+        # Jami foydalanuvchilar
+        cursor.execute("SELECT COUNT(*) FROM users")
+        total_users = cursor.fetchone()[0]
+        
+        # Eng ko'p odam taklif qilgan 5 kishi
+        cursor.execute("SELECT user_id, ref_count FROM users ORDER BY ref_count DESC LIMIT 5")
+        top_users = cursor.fetchall()
+        
+        conn.close()
+        
+        stat_text = f"📊 **Bot Statistikasi**\n\n"
+        stat_text += f"👥 Jami foydalanuvchilar: {total_users}\n\n"
+        stat_text += f"🏆 **Top taklif qiluvchilar:**\n"
+        
+        for i, (uid, count) in enumerate(top_users, 1):
+            stat_text += f"{i}. ID: `{uid}` — {count} ta taklif\n"
+            
+        await message.answer(stat_text, parse_mode="Markdown")
+    else:
+        await message.answer("Ushbu buyruq faqat administrator uchun! 🔐")
 
 @dp.message(Command("referral"))
 async def referral_cmd(message: types.Message):
