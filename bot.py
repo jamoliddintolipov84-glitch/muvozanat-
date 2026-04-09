@@ -7,7 +7,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.storage.memory import MemoryStorage 
+from aiogram.fsm.storage.memory import MemoryStorage
 
 # --- SOZLAMALAR ---
 API_TOKEN = '8710801366:AAGrsujotucdhiAm1aV0vMhbWStk_WBt_Ik' 
@@ -17,7 +17,6 @@ ADMIN_ID = 5711329638
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
-# FSM xotirasi qo'shildi
 dp = Dispatcher(storage=MemoryStorage())
 
 class FeedbackState(StatesGroup):
@@ -69,24 +68,30 @@ async def start_cmd(message: types.Message):
     add_or_update_user(user_id, inviter_id)
 
     if not await check_sub(user_id):
+        welcome_text = (
+            f"👋 **Assalomu alaykum, {name}!**\n\n"
+            f"⏳ **Muvozanat** — bu hayotingizni tartibga solish va vaqtdan unumli foydalanishni o'rgatuvchi yordamchingiz.\n\n"
+            f"🚀 **Botdan foydalanish uchun:**\n"
+            f"Avval rasmiy kanalimizga a'zo bo'lishingiz lozim."
+        )
         builder = InlineKeyboardBuilder()
         builder.row(types.InlineKeyboardButton(text="📢 Kanalga obuna bo'lish", url=f"https://t.me/{CHANNEL_ID[1:]}"))
-        builder.row(types.InlineKeyboardButton(text="🔄 Tekshirish", callback_data="check_sub"))
-        await message.answer(f"Assalomu alaykum, {name}! ✨\nBoshlash uchun kanalga a'zo bo'ling.", reply_markup=builder.as_markup())
+        builder.row(types.InlineKeyboardButton(text="✅ A'zo bo'ldim", callback_data="check_sub"))
+        await message.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
     else:
         await show_status(message)
 
 # ALOQA
 @dp.message(Command("aloqa"))
 async def aloqa_cmd(message: types.Message, state: FSMContext):
-    await message.answer("✍️ Adminga xabaringizni yozing:")
+    await message.answer("💬 **Adminga xabar yuborish**\n\nSavol, taklif yoki g'oyalaringizni yozib qoldiring. Biz albatta javob beramiz!", parse_mode="Markdown")
     await state.set_state(FeedbackState.waiting_for_msg)
 
 @dp.message(FeedbackState.waiting_for_msg)
 async def get_feedback(message: types.Message, state: FSMContext):
-    user_info = f"ID: `{message.from_user.id}`\nUser: @{message.from_user.username or 'NoUser'}"
-    await bot.send_message(ADMIN_ID, f"📩 **Yangi xabar!**\n\n{user_info}\n\nXabar: {message.text}", parse_mode="Markdown")
-    await message.answer("✅ Xabaringiz yuborildi!")
+    user_info = f"👤 **Kimdan:** {message.from_user.full_name}\n🆔 **ID:** `{message.from_user.id}`\n🔗 **User:** @{message.from_user.username or 'yoq'}"
+    await bot.send_message(ADMIN_ID, f"📩 **Yangi xabar keldi!**\n\n{user_info}\n\n📝 **Xabar:**\n{message.text}\n\n—\n*Javob berish uchun xabarga Reply qiling*", parse_mode="Markdown")
+    await message.answer("✅ **Xabaringiz yuborildi!**\nTez orada administrator javob qaytaradi. Sabr uchun rahmat! ✨", parse_mode="Markdown")
     await state.clear()
 
 # REPLY JAVOB (ADMIN UCHUN)
@@ -94,11 +99,11 @@ async def get_feedback(message: types.Message, state: FSMContext):
 async def reply_to_user(message: types.Message):
     try:
         original_msg = message.reply_to_message.text
-        user_id = int(original_msg.split("ID: `")[1].split("`")[0])
-        await bot.send_message(user_id, f"✉️ **Admindan javob:**\n\n{message.text}")
-        await message.answer("✅ Javob yuborildi!")
+        user_id = int(original_msg.split("ID:** `")[1].split("`")[0])
+        await bot.send_message(user_id, f"✉️ **Admindan javob keldi:**\n\n{message.text}\n\n📌 *Yana savollar bo'lsa, /aloqa buyrug'idan foydalaning.*", parse_mode="Markdown")
+        await message.answer("✅ Javob foydalanuvchiga muvaffaqiyatli yetkazildi!")
     except:
-        await message.answer("❌ Xatolik: User ID topilmadi.")
+        await message.answer("❌ **Xatolik:** Foydalanuvchi ID raqamini aniqlashda muammo yuz berdi.")
 
 # STATISTIKA
 @dp.message(Command("statistika"))
@@ -109,7 +114,13 @@ async def stat_cmd(message: types.Message):
         cursor.execute("SELECT COUNT(*) FROM users")
         total = cursor.fetchone()[0]
         conn.close()
-        await message.answer(f"📊 Jami foydalanuvchilar: {total}")
+        
+        stat_text = (
+            f"📊 **Botning hozirgi holati:**\n\n"
+            f"👥 Jami foydalanuvchilar: **{total} ta**\n"
+            f"🕒 Yangilangan vaqt: {message.date.strftime('%H:%M:%S')}"
+        )
+        await message.answer(stat_text, parse_mode="Markdown")
 
 async def show_status(message: types.Message):
     user_id = message.from_user.id
@@ -118,14 +129,31 @@ async def show_status(message: types.Message):
     ref_link = f"https://t.me/{bot_info.username}?start={user_id}"
     
     if count < 2:
-        share_url = f"https://t.me/share/url?url={ref_link}"
+        share_msg = f"🚀 Men 'Muvozanat' ilovasida o'z natijamni yaxshilayapman! Sen ham bizga qo'shil va o'zgarishni boshla: {ref_link}"
+        share_url = f"https://t.me/share/url?url={ref_link}&text={urllib.parse.quote(share_msg)}"
+        
         builder = InlineKeyboardBuilder()
-        builder.row(types.InlineKeyboardButton(text="🔥 Do'stlarni chorlash", url=share_url))
-        await message.answer(f"📊 Takliflar: {count}/2\n🔗 Havola: `{ref_link}`", reply_markup=builder.as_markup())
+        builder.row(types.InlineKeyboardButton(text="📢 Do'stlarni taklif qilish", url=share_url))
+        
+        status_text = (
+            f"✅ **Tabriklaymiz, siz kanalga a'zosiz!**\n\n"
+            f"🎁 **Ilovani ochish uchun:**\n"
+            f"Yana **{2 - count} ta** do'stingizni taklif qilishingiz kerak.\n\n"
+            f"📊 **Sizning natijangiz:** {count} / 2\n"
+            f"🔗 **Taklif havolasi:**\n`{ref_link}`\n\n"
+            f"🌱 *O'zimiz bilan oqibatni uzmaylik!*"
+        )
+        await message.answer(status_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
     else:
         builder = InlineKeyboardBuilder()
-        builder.row(types.InlineKeyboardButton(text="Ilovani ochish 🪐", web_app=types.WebAppInfo(url=MINI_APP_URL)))
-        await message.answer("Hamma shartlar bajarildi! ✨", reply_markup=builder.as_markup())
+        builder.row(types.InlineKeyboardButton(text="🪐 Ilovani ochish", web_app=types.WebAppInfo(url=MINI_APP_URL)))
+        
+        win_text = (
+            f"🎉 **Barcha shartlar bajarildi!**\n\n"
+            f"Siz endi **Muvozanat** olamiga to'liq kirish huquqiga egasiz.\n"
+            f"Pastdagi tugmani bosing va kashf etishni boshlang! 👇"
+        )
+        await message.answer(win_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 @dp.callback_query(F.data == "check_sub")
 async def callback_check(call: types.CallbackQuery):
@@ -133,7 +161,7 @@ async def callback_check(call: types.CallbackQuery):
         await call.message.delete()
         await show_status(call.message)
     else:
-        await call.answer("A'zo bo'lmadingiz! ❌", show_alert=True)
+        await call.answer("❌ Siz hali kanalga a'zo bo'lmadingiz!", show_alert=True)
 
 async def main():
     init_db()
